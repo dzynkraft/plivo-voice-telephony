@@ -780,6 +780,9 @@ wss.on("connection", (ws, req) => {
           await session.end();
           session = null;
         }
+        if (conv) {
+          await conv.saveOnDrop();
+        }
         break;
       }
 
@@ -793,6 +796,9 @@ wss.on("connection", (ws, req) => {
     stopKeepAlive();
     session?.end().catch(() => {});
     session = null;
+    conv
+      ?.saveOnDrop()
+      .catch((err) => logger.error(`[WS] saveOnDrop failed: ${err.message}`));
   });
 
   ws.on("error", (err) => {
