@@ -18,7 +18,8 @@ const REQUIRED = [
   "PLIVO_FROM_NUMBER",
   "SARVAM_API_KEY",
   "SERVER_BASE_URL",
-  "GREETING_AUDIO_URL",
+  //"GREETING_AUDIO_URL",
+  "AURA_GREETING_AUDIO_URL",
 ];
 const missing = REQUIRED.filter((k) => !process.env[k]);
 if (missing.length) {
@@ -29,7 +30,8 @@ if (missing.length) {
 const PORT = parseInt(process.env.PORT || "8080", 10);
 const BASE_URL = process.env.SERVER_BASE_URL.replace(/\/$/, "");
 const LANGUAGE = process.env.SARVAM_LANGUAGE || "en-IN";
-const GREETING_AUDIO_URL = process.env.GREETING_AUDIO_URL; // your wav/mp3 with greeting + language question
+//const GREETING_AUDIO_URL = process.env.GREETING_AUDIO_URL; // your wav/mp3 with greeting + language question
+const AURA_GREETING_AUDIO_URL = process.env.AURA_GREETING_AUDIO_URL; // your wav/mp3 with greeting + language question
 const WS_STREAM_URL =
   BASE_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/stream";
 
@@ -113,7 +115,8 @@ async function prefetchAllAudioDurations() {
       if (url) urls.add(url);
     }
   }
-  if (GREETING_AUDIO_URL) urls.add(GREETING_AUDIO_URL);
+  // if (GREETING_AUDIO_URL) urls.add(GREETING_AUDIO_URL);
+  if (AURA_GREETING_AUDIO_URL) urls.add(AURA_GREETING_AUDIO_URL);
 
   logger.info(
     `[AUDIO] Prefetching durations for ${urls.size} known clip(s)...`,
@@ -139,7 +142,8 @@ app.all("/answer", (req, res) => {
   const toNumber = req.body?.To || req.query?.To || "unknown";
   const callUUID = req.body?.CallUUID || req.query?.CallUUID || "unknown";
   logger.info(`[HTTP] /answer — CallUUID: ${callUUID} To: ${toNumber}`);
-  const audioUrl = req.query.audioUrl;
+  // const audioUrl = req.query.audioUrl;
+  const audioUrl = process.env.AURA_GREETING_AUDIO_URL;
 
   console.log("Original URL:", req.originalUrl);
   console.log("Query:", req.query);
@@ -155,6 +159,9 @@ app.all("/answer", (req, res) => {
     }
   }
 
+  if (!audioUrl) {
+    audioUrl = "S3 path for ";
+  }
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
    <Play>${audioUrl}</Play>
@@ -491,11 +498,17 @@ wss.on("connection", (ws, req) => {
 prefetchAllAudioDurations()
   .catch((err) => logger.error(`[AUDIO] Prefetch failed: ${err.message}`))
   .finally(() => {
+    //httpServer.listen(PORT, "0.0.0.0", () => {
+    // logger.info(`\n🚀 Server running on port ${PORT}`);
+    // logger.info(`   Answer  : ${BASE_URL}/answer`);
+    // logger.info(`   Stream  : ${WS_STREAM_URL}`);
+    //  logger.info(`   Greeting: ${GREETING_AUDIO_URL}`);
+    //});
     httpServer.listen(PORT, "0.0.0.0", () => {
       logger.info(`\n🚀 Server running on port ${PORT}`);
       logger.info(`   Answer  : ${BASE_URL}/answer`);
       logger.info(`   Stream  : ${WS_STREAM_URL}`);
-      logger.info(`   Greeting: ${GREETING_AUDIO_URL}`);
+      logger.info(`   Greeting: ${AURA_GREETING_AUDIO_URL}`);
     });
   });
 

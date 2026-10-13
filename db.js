@@ -34,7 +34,8 @@ async function createCallLog({ callUUID, toNumber, startedAt }) {
           language: "unknown",
           qa: [], // [{ question: "...", answer: "..." }, ...]
           answers: {},
-          step: "CONFIRM_PERSON",
+          //step: "CONFIRM_PERSON",
+          step: "ASK_SOC2",
           outcome: null,
           endedAt: null,
           durationSec: null,

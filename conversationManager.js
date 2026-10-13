@@ -35,6 +35,30 @@
  *    outcome: call_dropped
  */
 
+/**
+ * conversationManager.js — Aura Grid B2BSaas Full Script
+ *
+ * FLOW:
+ *  [Greeting audio plays via <Play> in /answer XML]
+ *  "Hi, I'm Lisa, an AI assistant calling from AuraGrid. I saw you spun up a free trial yesterday, but haven't connected your database yet.
+ Did you run into any issues, or would you like our quick-start guide emailed over?"
+ * 
+ *  STEP: ASK_SOC2
+ *    [yes]     → askTechMeet    → STEP: ASK_TECHMEET   [Part A] leadScore: -
+ *    [no]      → callbackAuraGoodbye   → done ❌              [Part A] leadScore: -
+ *    [unclear] → callbackAuraGoodbye → done ❌             [Part B] leadScore: Maybe
+ *
+ *    STEP: ASK_TECHMEET
+ *    [yes]     → callbackAuraGoodbye   → STEP: DONE            [Part A] leadScore: - 
+ *    [no]      → callbackAuraGoodbye   → done ❌                 [Part A] leadScore: - 
+ *    [unclear] → callbackAuraGoodbye → done ✅                 [Part B] leadScore: Maybe
+ * 
+ *  CALL DROP (at any step):
+ *    ASK_SOC2 → leadScore: Negative  (never confirmed identity)
+ *    any other step → leadScore: Maybe     (got past intro but dropped)
+ *    outcome: call_dropped
+ */
+
 const logger = require("./logger");
 const { createCallLog, updateCallLog } = require("./db");
 
@@ -64,6 +88,11 @@ const POSITIVE_WORDS = [
   "అవును",
   "sari",
   "సరి",
+  "Ouah",
+  "Ouais",
+  "Absolument",
+  "Carrément",
+  "D'accord"
 ];
 
 const NEGATIVE_WORDS = [
@@ -83,6 +112,9 @@ const NEGATIVE_WORDS = [
   "not looking",
   "i did not",
   "i haven't",
+  "Non, merci.",
+  "Non, désolé(e)",
+  "Pas du tout"
 ];
 
 function isPositive(text) {
@@ -99,6 +131,8 @@ function detectLanguage(text) {
     return "en";
   if (["telugu", "telgu", "teligi", "తెలుగు"].some((w) => t.includes(w)))
     return "te";
+  if (["french", "francais", "français"].some((w) => t.includes(w))) 
+    return "fr";
   return null;
 }
 
@@ -125,9 +159,12 @@ const AUDIO = {
     notAvailable: process.env.AUDIO_NOT_AVAILABLE_EN,
     askLanguage: process.env.AUDIO_ASK_LANGUAGE_EN,
     askBHK: process.env.AUDIO_ASK_BHK_EN,
+    askSOC2: process.env.AUDIO_ASK_SOC2_EN,
+    askTechMeet: process.env.AUDIO_ASK_TECHMEET_EN,
     details4BHK: process.env.AUDIO_DETAILS_4BHK_EN,
     details5BHK: process.env.AUDIO_DETAILS_5BHK_EN,
     callbackGoodbye: process.env.AUDIO_CALLBACK_GOODBYE_EN,
+    callbackAuraGoodbye: process.env.AUDIO_CALLBACK_AURA_GOODBYE_EN,
     noCallbackGoodbye: process.env.AUDIO_NO_CALLBACK_GOODBYE_EN,
     branchB_goodbye: process.env.AUDIO_BRANCH_B_GOODBYE_EN,
     branchC_offer: process.env.AUDIO_BRANCH_C_OFFER_EN,
@@ -137,25 +174,51 @@ const AUDIO = {
     notAvailable: process.env.AUDIO_NOT_AVAILABLE_TE,
     askLanguage: process.env.AUDIO_ASK_LANGUAGE_TE,
     askBHK: process.env.AUDIO_ASK_BHK_TE,
+    askSOC2: process.env.AUDIO_ASK_SOC2_TE,
+    askTechMeet: process.env.AUDIO_ASK_TECHMEET_TE,
     details4BHK: process.env.AUDIO_DETAILS_4BHK_TE,
     details5BHK: process.env.AUDIO_DETAILS_5BHK_TE,
     callbackGoodbye: process.env.AUDIO_CALLBACK_GOODBYE_TE,
+    callbackAuraGoodbye: process.env.AUDIO_CALLBACK_AURA_GOODBYE_TE,
     noCallbackGoodbye: process.env.AUDIO_NO_CALLBACK_GOODBYE_TE,
     branchB_goodbye: process.env.AUDIO_BRANCH_B_GOODBYE_TE,
     branchC_offer: process.env.AUDIO_BRANCH_C_OFFER_TE,
     didNotUnderstand: process.env.AUDIO_NOT_UNDERSTOOD_TE,
   },
+  fr: {
+    notAvailable: process.env.AUDIO_NOT_AVAILABLE_FR,
+    askLanguage: process.env.AUDIO_ASK_LANGUAGE_FR,
+    askBHK: process.env.AUDIO_ASK_BHK_FR,
+    askSOC2: process.env.AUDIO_ASK_SOC2_FR,
+    askTechMeet: process.env.AUDIO_ASK_TECHMEET_FR,
+    details4BHK: process.env.AUDIO_DETAILS_4BHK_FR,
+    details5BHK: process.env.AUDIO_DETAILS_5BHK_FR,
+    callbackGoodbye: process.env.AUDIO_CALLBACK_GOODBYE_FR,
+    callbackAuraGoodbye: process.env.AUDIO_CALLBACK_AURA_GOODBYE_FR,
+    noCallbackGoodbye: process.env.AUDIO_NO_CALLBACK_GOODBYE_FR,
+    branchB_goodbye: process.env.AUDIO_BRANCH_B_GOODBYE_FR,
+    branchC_offer: process.env.AUDIO_BRANCH_C_OFFER_FR,
+    didNotUnderstand: process.env.AUDIO_NOT_UNDERSTOOD_FR,
+  },
 };
 
 // ── Question text — saved to DB alongside each answer ────────────────────────
 const QUESTION_TEXT = {
-  CONFIRM_PERSON: process.env.Q_CONFIRM_PERSON || "Is this Mr./Ms. [name]?",
+  CONFIRM_PERSON: 
+    process.env.Q_CONFIRM_PERSON || 
+    "Is this Mr./Ms. [name]?",
   ASK_LANGUAGE:
     process.env.Q_ASK_LANGUAGE ||
     "Are you comfortable with English? Or should we talk in Telugu?",
   ASK_BHK:
     process.env.Q_ASK_BHK ||
     "I saw you had expressed an interest in MSN One project in Neopolis. Are you looking for a 4 or 5 BHK?",
+  ASK_SOC2:
+    process.env.Q_ASK_SOC2 ||
+    "Makes sense DevOps access is usually the main hold-up. While you wait, want me to email our security one-pager? It covers SOC 2 and data handling, which usually speeds up approvals.",
+  ASK_TECHMEET:
+    process.env.Q_ASK_TECHMEET ||
+    "That's great! I'll send that to your email now. I'll also include a link to book a quick 15-minute call with a tech specialist if you run into any setup errors later. Sound good?",
   ASK_CALLBACK:
     process.env.Q_ASK_CALLBACK ||
     "Would you like to know more about the details? I can ask my senior Neha Kapoor to connect with you soon.",
@@ -170,12 +233,19 @@ const LEAD_SCORE = {
   NEGATIVE: "Negative",
 };
 
+// const STEP = {
+//   CONFIRM_PERSON: "CONFIRM_PERSON",
+//   ASK_LANGUAGE: "ASK_LANGUAGE",
+//   ASK_BHK: "ASK_BHK",
+//   ASK_CALLBACK: "ASK_CALLBACK",
+//   ASK_OTHER_BHK: "ASK_OTHER_BHK",
+//   DONE: "DONE",
+// };
+
 const STEP = {
-  CONFIRM_PERSON: "CONFIRM_PERSON",
-  ASK_LANGUAGE: "ASK_LANGUAGE",
-  ASK_BHK: "ASK_BHK",
-  ASK_CALLBACK: "ASK_CALLBACK",
-  ASK_OTHER_BHK: "ASK_OTHER_BHK",
+  ASK_SOC2: "ASK_SOC2",
+  ASK_TECHMEET: "ASK_TECHMEET",
+
   DONE: "DONE",
 };
 
@@ -183,7 +253,8 @@ class ConversationManager {
   constructor(callUUID, toNumber = "unknown") {
     this.callUUID = callUUID;
     this.toNumber = toNumber;
-    this.step = STEP.CONFIRM_PERSON;
+    //this.step = STEP.CONFIRM_PERSON;
+    this.step = STEP.ASK_SOC2;
     this.language = "en";
     this.answers = {};
     this.startedAt = Date.now();
@@ -225,14 +296,16 @@ class ConversationManager {
     // Assign lead score based on which step they were on when call dropped
     if (!this.answers.leadScore) {
       this.answers.leadScore =
-        this.step === STEP.CONFIRM_PERSON
+        // this.step === STEP.CONFIRM_PERSON
+        this.step === STEP.ASK_SOC2
           ? LEAD_SCORE.NEGATIVE // never confirmed identity
           : LEAD_SCORE.MAYBE; // got past intro but dropped
     }
 
     // Mark as not interested if we never got a BHK answer
     if (this.answers.interested === undefined) {
-      this.answers.interested = this.step === STEP.ASK_CALLBACK; // true only if they reached callback step
+      //this.answers.interested = this.step === STEP.ASK_CALLBACK; // true only if they reached callback step
+      this.answers.interested = this.step === STEP.ASK_TECHMEET; // true only if they reached callback step
     }
 
     this.step = STEP.DONE;
@@ -376,6 +449,48 @@ class ConversationManager {
         // BHK unclear — re-ask
         // await this._save();
         return { audioUrl: this.audio("didNotUnderstand"), done: false };
+      }
+
+      // Asking for security one-pager? It covers SOC 2 etc.
+      case STEP.ASK_SOC2: {
+        if (isNegative(transcript)) {
+          logger.info(`[${this.callUUID}][Conv] SOC2 Not confirmed → ending call`);
+          this.answers.interested = false;
+          this.answers.leadScore = LEAD_SCORE.NEGATIVE;
+          this.step = STEP.DONE;
+          this._saveAsync("soc2_not_confirmed");
+          return { audioUrl: this.audio("callbackAuraGoodbye"), done: true };
+        }
+        if (isPositive(transcript)) {
+          logger.info(`[${this.callUUID}][Conv] Confirmed → confirm SOC2`);
+          this.step = STEP.ASK_TECHMEET;
+          // await this._save();
+          return { audioUrl: this.audio("askTechMeet"), done: false };
+        }
+        // Unclear — re-ask
+        // await this._save();
+        return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
+      }
+
+      // Asking for tech meet?
+      case STEP.ASK_TECHMEET: {
+        if (isNegative(transcript)) {
+          logger.info(`[${this.callUUID}][Conv] Not confirmed TECHMEET → ending call`);
+          this.answers.interested = false;
+          this.answers.leadScore = LEAD_SCORE.NEGATIVE;
+          this.step = STEP.DONE;
+          this._saveAsync("techmeet_not_confirmed");
+          return { audioUrl: this.audio("callbackAuraGoodbye"), done: true };
+        }
+        if (isPositive(transcript)) {
+          logger.info(`[${this.callUUID}][Conv] Confirmed → confirm Techmeet`);
+          this.step = STEP.DONE;
+          // await this._save();
+          return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
+        }
+        // Unclear — re-ask
+        // await this._save();
+        return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
       }
 
       // ── "Shall I ask Neha to call?" ─────────────────────────────────────
