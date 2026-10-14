@@ -17,6 +17,14 @@ const docClient = DynamoDBDocumentClient.from(client, {
 
 const TABLE = process.env.DYNAMO_TABLE_NAME || "call_logs";
 
+const customerConfigId = process.env.AURA_CUSTOMER_CONFIG_ID || "default";
+
+let firstStep = "";
+if (customerConfigId === "default") {
+  firstStep = CONFIRM_PERSON;
+} else if (customerConfigId === "auragrid") {
+  firstStep = CONFIRM_QUICKSTART_GUIDE;
+}
 /**
  * Called on the very first turn — creates the record in DynamoDB.
  */
@@ -34,8 +42,7 @@ async function createCallLog({ callUUID, toNumber, startedAt }) {
           language: "unknown",
           qa: [], // [{ question: "...", answer: "..." }, ...]
           answers: {},
-          //step: "CONFIRM_PERSON",
-          step: "ASK_SOC2",
+          step: firstStep,
           outcome: null,
           endedAt: null,
           durationSec: null,

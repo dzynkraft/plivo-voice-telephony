@@ -43,18 +43,23 @@
  *  "Hi, I'm Lisa, an AI assistant calling from AuraGrid. I saw you spun up a free trial yesterday, but haven't connected your database yet.
  Did you run into any issues, or would you like our quick-start guide emailed over?"
  * 
+ *  STEP: CONFIRM_QUICKSTART_GUIDE
+ *    [yes]     → askSOC2      → STEP: ASK_SOC2
+ *    [no]      → callbackAuraGoodbye  → done ❌
+ *    [unclear] → callbackAuraGoodbye → re-ask
+ *
  *  STEP: ASK_SOC2
- *    [yes]     → askTechMeet    → STEP: ASK_TECHMEET   [Part A] leadScore: -
- *    [no]      → callbackAuraGoodbye   → done ❌              [Part A] leadScore: -
- *    [unclear] → callbackAuraGoodbye → done ❌             [Part B] leadScore: Maybe
+ *    [yes]     → askTechMeet    → STEP: ASK_TECHMEET    [Part A] leadScore: -
+ *    [no]      → callbackAuraGoodbye   → done ❌        [Part A] leadScore: - Negative
+ *    [unclear] → callbackAuraGoodbye → done ❌          [Part B] leadScore: Maybe
  *
  *    STEP: ASK_TECHMEET
  *    [yes]     → callbackAuraGoodbye   → STEP: DONE            [Part A] leadScore: - 
- *    [no]      → callbackAuraGoodbye   → done ❌                 [Part A] leadScore: - 
+ *    [no]      → callbackAuraGoodbye   → done ❌                 [Part A] leadScore: - Maybe
  *    [unclear] → callbackAuraGoodbye → done ✅                 [Part B] leadScore: Maybe
  * 
  *  CALL DROP (at any step):
- *    ASK_SOC2 → leadScore: Negative  (never confirmed identity)
+ *    CONFIRM_QUICKSTART_GUIDE → leadScore: Negative  (never confirmed identity)
  *    any other step → leadScore: Maybe     (got past intro but dropped)
  *    outcome: call_dropped
  */
@@ -213,12 +218,15 @@ const QUESTION_TEXT = {
   ASK_BHK:
     process.env.Q_ASK_BHK ||
     "I saw you had expressed an interest in MSN One project in Neopolis. Are you looking for a 4 or 5 BHK?",
+  CONFIRM_QUICKSTART_GUIDE: 
+    process.env.Q_CONFIRM_QUICKSTART_GUIDE || 
+    "Would you like our quick-start guide emailed over?",
   ASK_SOC2:
     process.env.Q_ASK_SOC2 ||
-    "Makes sense DevOps access is usually the main hold-up. While you wait, want me to email our security one-pager? It covers SOC 2 and data handling, which usually speeds up approvals.",
+    "Want me to email our security one-pager?",
   ASK_TECHMEET:
     process.env.Q_ASK_TECHMEET ||
-    "That's great! I'll send that to your email now. I'll also include a link to book a quick 15-minute call with a tech specialist if you run into any setup errors later. Sound good?",
+    "Link to book a quick 15-minute call with a tech specialist if you run into any setup errors later. Sound good?",
   ASK_CALLBACK:
     process.env.Q_ASK_CALLBACK ||
     "Would you like to know more about the details? I can ask my senior Neha Kapoor to connect with you soon.",
@@ -233,28 +241,38 @@ const LEAD_SCORE = {
   NEGATIVE: "Negative",
 };
 
-// const STEP = {
-//   CONFIRM_PERSON: "CONFIRM_PERSON",
-//   ASK_LANGUAGE: "ASK_LANGUAGE",
-//   ASK_BHK: "ASK_BHK",
-//   ASK_CALLBACK: "ASK_CALLBACK",
-//   ASK_OTHER_BHK: "ASK_OTHER_BHK",
-//   DONE: "DONE",
-// };
+const customerConfigId = process.env.AURA_CUSTOMER_CONFIG_ID || "default";
+let STEP = {};
+let firstStep = "";
+let lastStep = "";
 
-const STEP = {
-  ASK_SOC2: "ASK_SOC2",
-  ASK_TECHMEET: "ASK_TECHMEET",
-
-  DONE: "DONE",
-};
+if (customerConfigId === "default") {
+  STEP = {
+    CONFIRM_PERSON: "CONFIRM_PERSON",
+    ASK_LANGUAGE: "ASK_LANGUAGE",
+    ASK_BHK: "ASK_BHK",
+    ASK_CALLBACK: "ASK_CALLBACK",
+    ASK_OTHER_BHK: "ASK_OTHER_BHK",
+    DONE: "DONE",
+  };
+  firstStep = STEP.CONFIRM_PERSON;
+  lastStep = STEP.ASK_CALLBACK;
+} else if (customerConfigId === "auragrid") {
+  STEP = {
+    CONFIRM_QUICKSTART_GUIDE: "CONFIRM_QUICKSTART_GUIDE",
+    ASK_SOC2: "ASK_SOC2",
+    ASK_TECHMEET: "ASK_TECHMEET",
+    DONE: "DONE",
+  };
+  firstStep = STEP.CONFIRM_QUICKSTART_GUIDE;
+  lastStep = STEP.ASK_TECHMEET;
+}
 
 class ConversationManager {
   constructor(callUUID, toNumber = "unknown") {
     this.callUUID = callUUID;
     this.toNumber = toNumber;
-    //this.step = STEP.CONFIRM_PERSON;
-    this.step = STEP.ASK_SOC2;
+    this.step = firstStep;
     this.language = "en";
     this.answers = {};
     this.startedAt = Date.now();
@@ -296,16 +314,14 @@ class ConversationManager {
     // Assign lead score based on which step they were on when call dropped
     if (!this.answers.leadScore) {
       this.answers.leadScore =
-        // this.step === STEP.CONFIRM_PERSON
-        this.step === STEP.ASK_SOC2
+        this.step === firstStep
           ? LEAD_SCORE.NEGATIVE // never confirmed identity
           : LEAD_SCORE.MAYBE; // got past intro but dropped
     }
 
     // Mark as not interested if we never got a BHK answer
     if (this.answers.interested === undefined) {
-      //this.answers.interested = this.step === STEP.ASK_CALLBACK; // true only if they reached callback step
-      this.answers.interested = this.step === STEP.ASK_TECHMEET; // true only if they reached callback step
+      this.answers.interested = this.step === lastStep; // true only if they reached the last step
     }
 
     this.step = STEP.DONE;
@@ -449,6 +465,28 @@ class ConversationManager {
         // BHK unclear — re-ask
         // await this._save();
         return { audioUrl: this.audio("didNotUnderstand"), done: false };
+      }
+      
+      // Would you like our quick-start guide emailed over?
+      case STEP.CONFIRM_QUICKSTART_GUIDE: {
+        if (isNegative(transcript)) {
+          logger.info(`[${this.callUUID}][Conv] Not confirmed quickstart guide → ending call`);
+          this.answers.interested = false;
+          this.answers.leadScore = LEAD_SCORE.NEGATIVE;
+          this.step = STEP.DONE;
+          // await this._save("quickstart_guide_not_confirmed");
+          this._saveAsync("quickstart_guide_not_confirmed");
+          return { audioUrl: this.audio("callbackAuraGoodbye"), done: true };
+        }
+        if (isPositive(transcript)) {
+          logger.info(`[${this.callUUID}][Conv] confirmed quickstart guide → asking SOC2`);
+          this.step = STEP.ASK_SOC2;
+          // await this._save();
+          return { audioUrl: this.audio("askSOC2"), done: false };
+        }
+        // Unclear — re-ask
+        // await this._save();
+        return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
       }
 
       // Asking for security one-pager? It covers SOC 2 etc.
