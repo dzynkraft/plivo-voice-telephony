@@ -21,9 +21,9 @@ const customerConfigId = process.env.AURA_CUSTOMER_CONFIG_ID || "default";
 
 let firstStep = "";
 if (customerConfigId === "default") {
-  firstStep = CONFIRM_PERSON;
+  firstStep = "CONFIRM_PERSON";
 } else if (customerConfigId === "auragrid") {
-  firstStep = CONFIRM_QUICKSTART_GUIDE;
+  firstStep = "CONFIRM_QUICKSTART_GUIDE";
 }
 /**
  * Called on the very first turn — creates the record in DynamoDB.
