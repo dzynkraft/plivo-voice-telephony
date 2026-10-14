@@ -43,6 +43,7 @@ if (customerConfigId === "default") {
   }
   GREETING_AUDIO_URL = process.env.AURA_GREETING_AUDIO_URL;
 }
+logger.info(`Using GREETING_AUDIO_URL: ${GREETING_AUDIO_URL}`);
 
 const WS_STREAM_URL =
   BASE_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/stream";
@@ -157,7 +158,7 @@ app.all("/answer", (req, res) => {
   if (customerConfigId === "default") {
     audioUrl = req.query.audioUrl;
   } else if (customerConfigId === "auragrid") {
-    audioUrl = GREETING_AUDIO_URL;
+    audioUrl = process.env.AURA_GREETING_AUDIO_URL;
   }
 
   console.log("Original URL:", req.originalUrl);
