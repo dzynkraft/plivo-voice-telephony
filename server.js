@@ -154,12 +154,7 @@ app.all("/answer", (req, res) => {
   const toNumber = req.body?.To || req.query?.To || "unknown";
   const callUUID = req.body?.CallUUID || req.query?.CallUUID || "unknown";
   logger.info(`[HTTP] /answer — CallUUID: ${callUUID} To: ${toNumber}`);
-  let audioUrl = "";
-  if (customerConfigId === "default") {
-    audioUrl = req.query.audioUrl;
-  } else if (customerConfigId === "auragrid") {
-    audioUrl = process.env.AURA_GREETING_AUDIO_URL;
-  }
+  const audioUrl = req.query.audioUrl;
 
   console.log("Original URL:", req.originalUrl);
   console.log("Query:", req.query);

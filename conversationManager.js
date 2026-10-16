@@ -40,26 +40,30 @@
  *
  * FLOW:
  *  [Greeting audio plays via <Play> in /answer XML]
- *  "Hi, I'm Lisa, an AI assistant calling from AuraGrid. I saw you spun up a free trial yesterday, but haven't connected your database yet.
- Did you run into any issues, or would you like our quick-start guide emailed over?"
+ *  "Hi, I'm Lisa, an AI assistant calling from AuraGrid. Is this Mr. [name]?"
  * 
- *  STEP: CONFIRM_QUICKSTART_GUIDE
+ *  STEP: CONFIRM_PERSON
+ *    [yes]     → askQuickStartGuide      → STEP: ASK_QUICKSTART_GUIDE
+ *    [no]      → callbackAuraGoodbye     → done ❌ [Part A] leadScore: -Negative
+ *    [unclear] → callbackAuraGoodbye     → done ❌
+ * 
+ *  STEP: ASK_QUICKSTART_GUIDE
  *    [yes]     → askSOC2      → STEP: ASK_SOC2
  *    [no]      → callbackAuraGoodbye  → done ❌
- *    [unclear] → callbackAuraGoodbye → re-ask
+ *    [unclear  → callbackAuraGoodbye → done ✅  
  *
  *  STEP: ASK_SOC2
  *    [yes]     → askTechMeet    → STEP: ASK_TECHMEET    [Part A] leadScore: -
- *    [no]      → callbackAuraGoodbye   → done ❌        [Part A] leadScore: - Negative
+ *    [no]      → callbackAuraGoodbye   → done ❌        [Part A] leadScore: - 
  *    [unclear] → callbackAuraGoodbye → done ❌          [Part B] leadScore: Maybe
  *
  *    STEP: ASK_TECHMEET
  *    [yes]     → callbackAuraGoodbye   → STEP: DONE            [Part A] leadScore: - 
- *    [no]      → callbackAuraGoodbye   → done ❌                 [Part A] leadScore: - Maybe
+ *    [no]      → callbackAuraGoodbye   → done ❌                 [Part A] leadScore: - 
  *    [unclear] → callbackAuraGoodbye → done ✅                 [Part B] leadScore: Maybe
  * 
  *  CALL DROP (at any step):
- *    CONFIRM_QUICKSTART_GUIDE → leadScore: Negative  (never confirmed identity)
+ *    CONFIRM_PERSON → leadScore: Negative  (never confirmed identity)
  *    any other step → leadScore: Maybe     (got past intro but dropped)
  *    outcome: call_dropped
  */
@@ -164,6 +168,7 @@ const AUDIO = {
     notAvailable: process.env.AUDIO_NOT_AVAILABLE_EN,
     askLanguage: process.env.AUDIO_ASK_LANGUAGE_EN,
     askBHK: process.env.AUDIO_ASK_BHK_EN,
+    askQuickStartGuide: process.env.AUDIO_ASK_QUICKSTART_GUIDE_EN,
     askSOC2: process.env.AUDIO_ASK_SOC2_EN,
     askTechMeet: process.env.AUDIO_ASK_TECHMEET_EN,
     details4BHK: process.env.AUDIO_DETAILS_4BHK_EN,
@@ -179,6 +184,7 @@ const AUDIO = {
     notAvailable: process.env.AUDIO_NOT_AVAILABLE_TE,
     askLanguage: process.env.AUDIO_ASK_LANGUAGE_TE,
     askBHK: process.env.AUDIO_ASK_BHK_TE,
+    askQuickStartGuide: process.env.AUDIO_ASK_QUICKSTART_GUIDE_TE,
     askSOC2: process.env.AUDIO_ASK_SOC2_TE,
     askTechMeet: process.env.AUDIO_ASK_TECHMEET_TE,
     details4BHK: process.env.AUDIO_DETAILS_4BHK_TE,
@@ -193,6 +199,7 @@ const AUDIO = {
   fr: {
     notAvailable: process.env.AUDIO_NOT_AVAILABLE_FR,
     askLanguage: process.env.AUDIO_ASK_LANGUAGE_FR,
+    askQuickStartGuide: process.env.AUDIO_ASK_QUICKSTART_GUIDE_FR,
     askBHK: process.env.AUDIO_ASK_BHK_FR,
     askSOC2: process.env.AUDIO_ASK_SOC2_FR,
     askTechMeet: process.env.AUDIO_ASK_TECHMEET_FR,
@@ -218,8 +225,8 @@ const QUESTION_TEXT = {
   ASK_BHK:
     process.env.Q_ASK_BHK ||
     "I saw you had expressed an interest in MSN One project in Neopolis. Are you looking for a 4 or 5 BHK?",
-  CONFIRM_QUICKSTART_GUIDE: 
-    process.env.Q_CONFIRM_QUICKSTART_GUIDE || 
+  ASK_QUICKSTART_GUIDE: 
+    process.env.Q_ASK_QUICKSTART_GUIDE || 
     "Would you like our quick-start guide emailed over?",
   ASK_SOC2:
     process.env.Q_ASK_SOC2 ||
@@ -259,12 +266,13 @@ if (customerConfigId === "default") {
   lastStep = STEP.ASK_CALLBACK;
 } else if (customerConfigId === "auragrid") {
   STEP = {
-    CONFIRM_QUICKSTART_GUIDE: "CONFIRM_QUICKSTART_GUIDE",
+    CONFIRM_PERSON: "CONFIRM_PERSON",
+    ASK_QUICKSTART_GUIDE: "ASK_QUICKSTART_GUIDE",
     ASK_SOC2: "ASK_SOC2",
     ASK_TECHMEET: "ASK_TECHMEET",
     DONE: "DONE",
   };
-  firstStep = STEP.CONFIRM_QUICKSTART_GUIDE;
+  firstStep = STEP.CONFIRM_PERSON;
   lastStep = STEP.ASK_TECHMEET;
 }
 
@@ -392,17 +400,30 @@ class ConversationManager {
           this.step = STEP.DONE;
           // await this._save("wrong_person");
           this._saveAsync("wrong_person");
-          return { audioUrl: this.audio("notAvailable"), done: true };
+          if (customerConfigId === "auragrid") {
+            return { audioUrl: this.audio("callbackAuraGoodbye"), done: true };
+          } else {
+            return { audioUrl: this.audio("notAvailable"), done: true };
+          }
         }
         if (isPositive(transcript)) {
           logger.info(`[${this.callUUID}][Conv] Confirmed → asking language`);
-          this.step = STEP.ASK_LANGUAGE;
           // await this._save();
-          return { audioUrl: this.audio("askLanguage"), done: false };
+          if (customerConfigId === "auragrid") {
+            this.step = STEP.ASK_QUICKSTART_GUIDE;
+            return { audioUrl: this.audio("askQuickStartGuide"), done: false };
+          } else {
+            this.step = STEP.ASK_LANGUAGE;
+            return { audioUrl: this.audio("askLanguage"), done: false };
+          }
         }
         // Unclear — re-ask
         // await this._save();
-        return { audioUrl: this.audio("didNotUnderstand"), done: false };
+        if (customerConfigId === "auragrid") {
+          return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
+        } else {
+          return { audioUrl: this.audio("didNotUnderstand"), done: false };
+        }
       }
 
       // ── "English or Telugu?" ────────────────────────────────────────────
@@ -468,7 +489,7 @@ class ConversationManager {
       }
       
       // Would you like our quick-start guide emailed over?
-      case STEP.CONFIRM_QUICKSTART_GUIDE: {
+      case STEP.ASK_QUICKSTART_GUIDE: {
         if (isNegative(transcript)) {
           logger.info(`[${this.callUUID}][Conv] Not confirmed quickstart guide → ending call`);
           this.answers.interested = false;

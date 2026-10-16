@@ -23,7 +23,7 @@ let firstStep = "";
 if (customerConfigId === "default") {
   firstStep = "CONFIRM_PERSON";
 } else if (customerConfigId === "auragrid") {
-  firstStep = "CONFIRM_QUICKSTART_GUIDE";
+  firstStep = "CONFIRM_PERSON";
 }
 /**
  * Called on the very first turn — creates the record in DynamoDB.
@@ -112,6 +112,9 @@ async function updateCallLog(data) {
 
     // Final turn only
     if (data.outcome) {
+
+      console.log(`[DB] Final turn detected — outcome: ${data.outcome}, endedAt: ${data.endedAt}, durationSec: ${data.durationSec}`,
+      );
       expParts.push("outcome = :outcome");
       values[":outcome"] = data.outcome;
 
