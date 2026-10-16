@@ -409,12 +409,13 @@ class ConversationManager {
           }
         }
         if (isPositive(transcript)) {
-          logger.info(`[${this.callUUID}][Conv] Confirmed → asking language`);
           // await this._save();
           if (customerConfigId === "auragrid") {
+            logger.info(`[${this.callUUID}][Conv] Confirmed person → asking quickstart guide`);
             this.step = STEP.ASK_QUICKSTART_GUIDE;
             return { audioUrl: this.audio("askQuickStartGuide"), done: false };
           } else {
+            logger.info(`[${this.callUUID}][Conv] Confirmed person → asking language`);
             this.step = STEP.ASK_LANGUAGE;
             return { audioUrl: this.audio("askLanguage"), done: false };
           }
@@ -523,7 +524,7 @@ class ConversationManager {
           return { audioUrl: this.audio("callbackAuraGoodbye"), done: true };
         }
         if (isPositive(transcript)) {
-          logger.info(`[${this.callUUID}][Conv] Confirmed → confirm SOC2`);
+          logger.info(`[${this.callUUID}][Conv] Confirmed SOC2 → asking tech meet`);
           this.step = STEP.ASK_TECHMEET;
           // await this._save();
           return { audioUrl: this.audio("askTechMeet"), done: false };
@@ -544,13 +545,11 @@ class ConversationManager {
           return { audioUrl: this.audio("callbackAuraGoodbye"), done: true };
         }
         if (isPositive(transcript)) {
-          logger.info(`[${this.callUUID}][Conv] Confirmed → confirm Techmeet`);
+          logger.info(`[${this.callUUID}][Conv] Confirmed Techmeet → Saying goodbye`);
           this.step = STEP.DONE;
           // await this._save();
           return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
         }
-        // Unclear — re-ask
-        // await this._save();
         return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
       }
 

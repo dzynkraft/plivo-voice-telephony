@@ -112,7 +112,6 @@ async function updateCallLog(data) {
 
     // Final turn only
     if (data.outcome) {
-
       console.log(`[DB] Final turn detected — outcome: ${data.outcome}, endedAt: ${data.endedAt}, durationSec: ${data.durationSec}`,
       );
       expParts.push("outcome = :outcome");
@@ -153,10 +152,14 @@ async function updateCallLog(data) {
       }),
     );
 
+    console.info(
+      `[DB] ✅ Updated — ${data.callUUID} | step: ${data.step}${data.outcome ? ` | outcome: ${data.outcome}` : ""}`,
+    );
     logger.info(
       `[DB] ✅ Updated — ${data.callUUID} | step: ${data.step}${data.outcome ? ` | outcome: ${data.outcome}` : ""}`,
     );
   } catch (err) {
+    console.error(`[DB] ❌ updateCallLog failed: ${err.message}`);
     logger.error(`[DB] ❌ updateCallLog failed: ${err.message}`);
   }
 }
