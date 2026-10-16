@@ -43,7 +43,7 @@ if (customerConfigId === "default") {
   }
   GREETING_AUDIO_URL = process.env.AURA_GREETING_AUDIO_URL;
 }
-console.log(`Using GREETING_AUDIO_URL: ${GREETING_AUDIO_URL}`);
+logger.info(`Using GREETING_AUDIO_URL: ${GREETING_AUDIO_URL}`);
 
 const WS_STREAM_URL =
   BASE_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/stream";
@@ -457,8 +457,6 @@ wss.on("connection", (ws, req) => {
 
     if (!conv) return;
 
-    logger.info(`Coming here 1`);
-
     try {
       const { audioUrl, done, language } =
         await conv.handleTranscript(transcript);
@@ -467,8 +465,6 @@ wss.on("connection", (ws, req) => {
       if (audioUrl) {
         const durationMs = await playAudioUrl(audioUrl);
 
-        logger.info('Coming here 2: Duration ' + durationMs);
-
         if (done) {
           // Use the clip's REAL measured duration (+ safety pad) to time the
           // hangup. If the caller barges in on the final goodbye clip too,
@@ -476,7 +472,6 @@ wss.on("connection", (ws, req) => {
           // isPlayingAudio — the hangup still fires on schedule regardless,
           // which is fine since the call is ending either way.
           const delay = durationMs + PLAYBACK_SAFETY_PAD_MS;
-          logger.info('Coming here 3: Duration ' + durationMs);
           logger.info(
             `[CONV] done=true — hanging up in ${delay}ms after goodbye audio`,
           );
@@ -493,7 +488,6 @@ wss.on("connection", (ws, req) => {
           }, delay);
         }
       } else if (done) {
-        logger.info('Coming here 4: No audio situation');
         // No audio to play — hang up immediately
         logger.info(`[CONV] done=true, no audio — hanging up now`);
         try {

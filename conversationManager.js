@@ -253,8 +253,7 @@ let STEP = {};
 let firstStep = "";
 let lastStep = "";
 
-console.log(`Using customerConfigId: ${customerConfigId}`);
-
+logger.info(`Using customerConfigId: ${customerConfigId}`);
 if (customerConfigId === "default") {
   STEP = {
     CONFIRM_PERSON: "CONFIRM_PERSON",
@@ -548,9 +547,9 @@ class ConversationManager {
           logger.info(`[${this.callUUID}][Conv] Confirmed Techmeet → Saying goodbye`);
           this.step = STEP.DONE;
           // await this._save();
-          return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
+          return { audioUrl: this.audio("callbackAuraGoodbye"), done: true };
         }
-        return { audioUrl: this.audio("callbackAuraGoodbye"), done: false };
+        return { audioUrl: this.audio("callbackAuraGoodbye"), done: true };
       }
 
       // ── "Shall I ask Neha to call?" ─────────────────────────────────────

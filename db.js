@@ -110,10 +110,9 @@ async function updateCallLog(data) {
     expParts.push("createdAt = if_not_exists(createdAt, :createdAt)");
     values[":createdAt"] = new Date().toISOString();
 
-    // Final turn only
+     // Final turn only
     if (data.outcome) {
-      console.log(`[DB] Final turn detected — outcome: ${data.outcome}, endedAt: ${data.endedAt}, durationSec: ${data.durationSec}`,
-      );
+      console.log(`DEBUG 1: [DB] Final turn detected — outcome: ${data.outcome}, endedAt: ${data.endedAt}, durationSec: ${data.durationSec}`);
       expParts.push("outcome = :outcome");
       values[":outcome"] = data.outcome;
 
@@ -136,9 +135,8 @@ async function updateCallLog(data) {
       phoneSentiment = "Negative";
     }
 
-    console.log(
-      `[DB] Sending phone sentiment: ${phoneSentiment} for number: ${data.toNumber}`,
-    );
+    console.log(`DEBUG 2: [DB] Sending phone sentiment: ${phoneSentiment} for number: ${data.toNumber}`);
+
     await putPhoneSentiment(phoneSentiment, data.toNumber);
 
     await docClient.send(
@@ -152,14 +150,12 @@ async function updateCallLog(data) {
       }),
     );
 
-    console.info(
-      `[DB] ✅ Updated — ${data.callUUID} | step: ${data.step}${data.outcome ? ` | outcome: ${data.outcome}` : ""}`,
-    );
+    console.info(`DEBUG 3: [DB] ✅ Updated — ${data.callUUID} | step: ${data.step}${data.outcome ? ` | outcome: ${data.outcome}` : ""}`,);
     logger.info(
       `[DB] ✅ Updated — ${data.callUUID} | step: ${data.step}${data.outcome ? ` | outcome: ${data.outcome}` : ""}`,
     );
   } catch (err) {
-    console.error(`[DB] ❌ updateCallLog failed: ${err.message}`);
+    console.error(`DEBUG 4: [DB] ❌ updateCallLog failed: ${err.message}`);
     logger.error(`[DB] ❌ updateCallLog failed: ${err.message}`);
   }
 }
@@ -168,9 +164,6 @@ module.exports = { createCallLog, updateCallLog };
 
 const putPhoneSentiment = async (phoneSentiment, toNumber) => {
   try {
-    console.log(
-      `[DB] entered putPhoneSentiment with sentiment: ${phoneSentiment} and number: ${toNumber}`,
-    );
     const response = await fetch(
       "https://lrtqr08n5c.execute-api.ap-south-1.amazonaws.com/Stage/phone-sentiment",
       {
