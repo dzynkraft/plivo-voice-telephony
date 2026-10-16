@@ -253,6 +253,8 @@ let STEP = {};
 let firstStep = "";
 let lastStep = "";
 
+console.log(`Using customerConfigId: ${customerConfigId}`);
+
 if (customerConfigId === "default") {
   STEP = {
     CONFIRM_PERSON: "CONFIRM_PERSON",

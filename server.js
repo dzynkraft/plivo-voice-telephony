@@ -43,7 +43,7 @@ if (customerConfigId === "default") {
   }
   GREETING_AUDIO_URL = process.env.AURA_GREETING_AUDIO_URL;
 }
-logger.info(`Using GREETING_AUDIO_URL: ${GREETING_AUDIO_URL}`);
+console.log(`Using GREETING_AUDIO_URL: ${GREETING_AUDIO_URL}`);
 
 const WS_STREAM_URL =
   BASE_URL.replace(/^https/, "wss").replace(/^http/, "ws") + "/stream";
